@@ -1,4 +1,13 @@
 import { world, system, EquipmentSlot, ItemStack } from '@minecraft/server';
+
+// Cooldown optimization
+const titleUpdateRate = 2;
+let lastTitleUpdate = 0;
+const cooldownPercentages = new Map();
+const lastSelectedItem = new Map();
+const activeCooldowns = new Set();
+const cooldowns = new Map();
+
 world.afterEvents.playerBreakBlock.subscribe(({
     itemStackAfterBreak: _0x3b80d9,
     player: _0x144b98
@@ -25,8 +34,28 @@ world.afterEvents.playerBreakBlock.subscribe(({
         }
     }
 });
-const axeTest = ["hacha", "battle", 'hammer', 'sickle', "gauntlets", "_axe", "scythe",];
+
+const axeTest = ["hacha", "battle", 'hammer', 'sickle', "gauntlets", "_axe", "scythe"];
 const swordTest = ["polearm", 'karambit', "dagger", "claymore", "glaive", "blade", 'knife', 'sable', "espada", 'katana', "sword", "Halberd", "Spade"];
+function startCooldown(player, cooldownType, cooldownDuration) {
+    const cooldownStart = Date.now();
+    const cooldownEnd = cooldownStart + cooldownDuration * 1000;
+    const playerCooldowns = cooldowns.get(player.id) || {};
+    playerCooldowns[cooldownType] = { cooldownStart, cooldownEnd };
+    cooldowns.set(player.id, playerCooldowns);
+    activeCooldowns.add(player.id);
+}
+
+function getCooldownPercent(player, cooldownType) {
+    const playerCooldowns = cooldowns.get(player.id) || {};
+    const cooldownData = playerCooldowns[cooldownType];
+    if (cooldownData) {
+        const remainingTime = Math.max(cooldownData.cooldownEnd - Date.now(), 0);
+        const cooldownPercent = Math.max(100 - (remainingTime / (cooldownData.cooldownEnd - cooldownData.cooldownStart)) * 100, 0);
+        return cooldownPercent;
+    }
+    return 100;
+}
 world.afterEvents.entityHurt.subscribe(({
     damage: _0x13efde,
     damageSource: _0x18c4da,
@@ -40,6 +69,7 @@ world.afterEvents.entityHurt.subscribe(({
         } = _0x18c4da.damagingEntity.getViewDirection();
         _0x3edd00.applyKnockback(_0x1d64e8, _0x335208, 0.75, 0.35);
     }
+
     if (_0x18c4da?.["damagingEntity"]?.['hasTag']("critical_hit") && _0x18c4da?.['cause'] === 'entityAttack') {
         const _0x41a702 = Math.floor(_0x13efde);
         for (let _0x1904a0 = 0x0; _0x1904a0 < _0x41a702 && _0x1904a0 < 0xf; _0x1904a0 += 0x2) {
@@ -63,6 +93,7 @@ function getSweepingEdgeLevel(_0x1d7b7b) {
     }
     return 0x0;
 }
+
 world.afterEvents.entityHitEntity.subscribe(({
     hitEntity: _0x2e078b,
     damagingEntity: _0x1977db
@@ -72,7 +103,6 @@ world.afterEvents.entityHitEntity.subscribe(({
         const _0x23891b = _0x47415f.getEquipment(EquipmentSlot.Mainhand);
         const _0xdebde = _0x23891b?.["getComponent"]('enchantable')?.['getEnchantment']("sharpness");
         const _0x302ec7 = _0x23891b?.['getComponent']("enchantable")?.["getEnchantment"]("density");
-
         const velocity = _0x1977db.getVelocity();
         const isCritical = !_0x1977db.isOnGround && velocity && velocity.y < -0.1;
 
@@ -114,7 +144,41 @@ world.afterEvents.entityHitEntity.subscribe(({
         }
     }, 0x1);
 });
+world.afterEvents.entityHitEntity.subscribe(async (event) => {
+    const attacker = event.damagingEntity;
+    const target = event.hitEntity;
 
+    if (!attacker || !target) {
+        return;
+    }
+
+    const inventory = attacker.getComponent("minecraft:inventory")?.container;
+    if (!inventory) return;
+
+    const mainHandItem = inventory.getItem(attacker.selectedSlotIndex);
+    if (!mainHandItem) return;
+
+    const validTools = ["axe", "sword", "pickaxe", "hoe", "shovel"];
+    const isValidTool = validTools.some(tool => mainHandItem.typeId.includes(tool));
+
+    if ((target.typeId == "minecraft:boat" || target.typeId == "minecraft:chest_boat") && isValidTool) {
+        target.applyDamage(100, {
+            cause: "none",
+            source: attacker,
+        });
+    }
+});
+world.afterEvents.entityHurt.subscribe(({
+    hurtEntity: _0x3fe72e,
+    damageSource: _0x30097f
+}) => {
+    if (_0x3fe72e.typeId === "minecraft:player" && _0x30097f.cause === "entityAttack") {
+        _0x3fe72e.addTag("raiyon:EntityAttacked");
+        system.runTimeout(() => {
+            _0x3fe72e.removeTag('raiyon:EntityAttacked');
+        }, 0x2);
+    }
+});
 world.afterEvents.entityHurt.subscribe(({
     hurtEntity: _0x3fe72e,
     damageSource: _0x30097f
@@ -213,7 +277,7 @@ const maceScoreIcon = {
     0x24: '',
     0x26: '',
     0x28: '',
-    0x2a: " "
+    0x2a: ""
 };
 system.runInterval(() => {
     const _0x442a01 = world.getAllPlayers();
@@ -336,11 +400,28 @@ system.runInterval(() => {
             _0x588e0c?.["setDynamicProperty"]("axe:score", 0x0);
         }
         if (_0x488a8e?.["typeId"] === "minecraft:mace") {
-            if (weaknessAmplifierMace(damageId(_0x2705e2 ? 0xa : _0x488a8e?.["typeId"]), _0x3fcda5) !== 0x0) {
-                _0x588e0c.addEffect("weakness", 0x2, {
-                    'amplifier': weaknessAmplifierMace(damageId(_0x488a8e?.["typeId"]), _0x3fcda5) - 0x1,
-                    'showParticles': false
+            // In your system.runInterval where the mace cooldown is handled
+            if (_0x488a8e?.["typeId"] === "minecraft:mace") {
+                if (weaknessAmplifierMace(damageId(_0x2705e2 ? 0xa : _0x488a8e?.["typeId"]), _0x3fcda5) !== 0x0) {
+                    _0x588e0c.addEffect("weakness", 0x2, {
+                        'amplifier': weaknessAmplifierMace(damageId(_0x488a8e?.["typeId"]), _0x3fcda5) - 0x1,
+                        'showParticles': false
+                    });
+                }
+
+                if (_0x3fcda5 === 0x0) {
+                    _0x588e0c.playAnimation("animation.player.mace");
+                }
+
+                // Replace the direct title setting with interpolated values
+                const smoothPercent = (_0x3fcda5 / 0x2a) * 100;
+                _0x588e0c.onScreenDisplay.setTitle(maceScoreIcon[_0x3fcda5] || '', {
+                    fadeInDuration: 2,
+                    stayDuration: 20,
+                    fadeOutDuration: 2
                 });
+
+                _0x588e0c?.["setDynamicProperty"]('mace:score', _0x3fcda5 >= 0x2a ? _0x3fcda5 + 0x0 : _0x3fcda5 + 0x1);
             }
             if (_0x3fcda5 === 0x0) {
                 _0x588e0c.playAnimation("animation.player.mace");
