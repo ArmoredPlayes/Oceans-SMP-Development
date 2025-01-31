@@ -72,15 +72,27 @@ world.afterEvents.entityHitEntity.subscribe(({
         const _0x23891b = _0x47415f.getEquipment(EquipmentSlot.Mainhand);
         const _0xdebde = _0x23891b?.["getComponent"]('enchantable')?.['getEnchantment']("sharpness");
         const _0x302ec7 = _0x23891b?.['getComponent']("enchantable")?.["getEnchantment"]("density");
+
+        const velocity = _0x1977db.getVelocity();
+        const isCritical = !_0x1977db.isOnGround && velocity && velocity.y < -0.1;
+
         if (_0xdebde || _0x302ec7) {
             _0x2e078b.runCommand("particle armor:enchanted_hit ~ ~1 ~");
+
+            if (isCritical) {
+                _0x2e078b.runCommand("effect @s instant_health 1 0 true");
+            } else {
+                _0x2e078b.runCommand("effect @s regeneration 3 0 true");
+            }
         }
+
         if (_0x1977db?.["getDynamicProperty"]("sword:score") >= 0xe && _0x1977db.isOnGround && _0x1977db.getDynamicProperty("raiyon:sprint") >= 0xa) {
             _0x1977db.runCommand("function java_combat/sweep");
             let _0x557396 = _0x23891b.getLore() || [];
             let _0xa29129 = getSweepingEdgeLevel(_0x557396);
             _0x1977db.runCommand("execute at @s positioned ^^1^2.5 run damage @e[r=2,type=!minecraft:item] " + (0x1 + _0xa29129) + " entity_attack entity @s");
         }
+
         _0x1977db?.["setDynamicProperty"]("mace:score", 0x0);
         _0x1977db?.["setDynamicProperty"]("axe:score", 0x0);
         _0x1977db?.["setDynamicProperty"]("sword:score", 0x0);
@@ -90,16 +102,19 @@ world.afterEvents.entityHitEntity.subscribe(({
         _0x1977db?.['setDynamicProperty']("trident:score", 0x0);
         _0x1977db?.["setDynamicProperty"]("hand:score", 0x0);
     }
+
     system.runTimeout(() => {
         const _0x511c5a = _0x2e078b?.["getComponent"]('equippable');
         const _0x2c1684 = _0x511c5a?.["getEquipment"](EquipmentSlot.Mainhand);
         const _0x22d756 = _0x511c5a?.['getEquipment'](EquipmentSlot.Offhand);
+
         if ((_0x22d756?.["typeId"] === "minecraft:shield" || _0x2c1684?.["typeId"] === "minecraft:shield") && _0x2e078b.typeId === "minecraft:player" && !_0x2e078b?.["hasTag"]('raiyon:EntityAttacked') && _0x2e078b.isSneaking) {
             const _0x1a7484 = _0x1977db.getViewDirection();
             _0x1977db.applyKnockback(_0x1a7484.x, _0x1a7484.z, 0.3, -0.4);
         }
     }, 0x1);
 });
+
 world.afterEvents.entityHurt.subscribe(({
     hurtEntity: _0x3fe72e,
     damageSource: _0x30097f
@@ -245,7 +260,7 @@ system.runInterval(() => {
         } else {
             _0x588e0c?.["setDynamicProperty"]("hand:score", 0x0);
         }
-        if (_0x488a8e?.["typeId"]["includes"]("trident")) {
+        if (_0x488a8e?.["typeId"]["includes"]("trident") || _0x488a8e?.["typeId"]["includes"]("impaler")) {
             if (weaknessAmplifierAxe(damageId(_0x488a8e?.["typeId"]), _0x38dce4) !== 0x0) {
                 _0x588e0c.addEffect("weakness", 0x2, {
                     'amplifier': _0x2705e2?.["level"] >= 0x4 ? 0xc : weaknessAmplifierAxe(damageId(_0x488a8e?.["typeId"]), _0x38dce4) - 0x1,
