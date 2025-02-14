@@ -1,6 +1,6 @@
 import { world, system, EquipmentSlot, ItemStack } from '@minecraft/server';
 
-// Cooldown optimization
+/// Cooldown optimization
 const titleUpdateRate = 2;
 let lastTitleUpdate = 0;
 const cooldownPercentages = new Map();
@@ -106,15 +106,32 @@ world.afterEvents.entityHitEntity.subscribe(({
         const velocity = _0x1977db.getVelocity();
         const isCritical = !_0x1977db.isOnGround && velocity && velocity.y < -0.1;
 
-        if (_0xdebde || _0x302ec7) {
-            _0x2e078b.runCommand("particle armor:enchanted_hit ~ ~1 ~");
+        const hasStrengthOne = _0x2e078b.getEffect("strength")?.amplifier === 0;
+        const hasStrengthTwo = _0x1977db.getEffect('strength')?.amplifier === 1;
+        const hasStrengthThree = _0x1977db.getEffect('strength')?.amplifier === 2;
+        const sharpnessEnchant = _0xdebde !== undefined;
+        const densityEnchant = _0x302ec7 !== undefined;
+        if (hasStrengthThree) {
+            _0x2e078b.runCommand("effect @s regeneration 1 4 true");
+        } else if (hasStrengthTwo) {
+            if ((sharpnessEnchant || densityEnchant)) {
+                _0x2e078b.runCommand("particle armor:enchanted_hit ~ ~1 ~");
 
+                if (isCritical) {
+                    _0x2e078b.runCommand("effect @s instant_health 1 0 true");
+                } else {
+                    _0x2e078b.runCommand("effect @s regeneration 3 0 true");
+                }
+
+                _0x2e078b.runCommand("damage @s 10 entity_attack");
+            }
+        } else if (hasStrengthOne) {
             if (isCritical) {
-                _0x2e078b.runCommand("effect @s instant_health 1 0 true");
-            } else {
-                _0x2e078b.runCommand("effect @s regeneration 3 0 true");
+                _0x2e078b.runCommand("effect @p[r=5,rm=0.1] regeneration 2 1 true");
             }
         }
+
+
 
         if (_0x1977db?.["getDynamicProperty"]("sword:score") >= 0xe && _0x1977db.isOnGround && _0x1977db.getDynamicProperty("raiyon:sprint") >= 0xa) {
             _0x1977db.runCommand("function java_combat/sweep");
@@ -277,7 +294,7 @@ const maceScoreIcon = {
     0x24: '',
     0x26: '',
     0x28: '',
-    0x2a: ""
+    0x2a: ""
 };
 system.runInterval(() => {
     const _0x442a01 = world.getAllPlayers();
@@ -414,12 +431,7 @@ system.runInterval(() => {
                 }
 
                 // Replace the direct title setting with interpolated values
-                const smoothPercent = (_0x3fcda5 / 0x2a) * 100;
-                _0x588e0c.onScreenDisplay.setTitle(maceScoreIcon[_0x3fcda5] || '', {
-                    fadeInDuration: 2,
-                    stayDuration: 20,
-                    fadeOutDuration: 2
-                });
+
 
                 _0x588e0c?.["setDynamicProperty"]('mace:score', _0x3fcda5 >= 0x2a ? _0x3fcda5 + 0x0 : _0x3fcda5 + 0x1);
             }
@@ -476,7 +488,7 @@ system.runInterval(() => {
         } else if (_0x37067f < 0xa) {
             _0x588e0c.setDynamicProperty("raiyon:sprint", _0x37067f + 0x1);
         }
-    });
+    })
 });
 world.afterEvents.entityHurt.subscribe(({
     damage: _0x40a174
